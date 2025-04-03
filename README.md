@@ -257,7 +257,3 @@ Forum replies with attached images:
 - Make sure the collections exist in your MongoDB database
 - Verify that images are accessible in your S3 bucket
 - Check the console logs for any error messages during startup
-
-## License
-
-This project is licensed under the MIT License.
