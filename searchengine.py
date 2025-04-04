@@ -147,6 +147,7 @@ def extract_images_from_mongodb():
     
     return image_data
 
+
 async def download_image_from_s3(image_url, direct_key=None):
     """Download image from S3 bucket"""
     try:
@@ -281,6 +282,12 @@ async def process_new_s3_object(key, bucket):
     except Exception as e:
         print(f"Error processing new S3 object {key}: {str(e)}")
         return False
+    
+
+@app.get("/")
+def read_root():
+    return {"message": "Server is running!"}
+
 
 @app.post("/webhooks/s3-event")
 async def process_s3_event(event: dict):
@@ -447,6 +454,16 @@ async def search_by_text(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error searching: {str(e)}")
 
+def convert_objectid_to_str(obj):
+    """Recursively convert ObjectId to string in a dictionary"""
+    if isinstance(obj, dict):
+        return {k: convert_objectid_to_str(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_objectid_to_str(item) for item in obj]
+    elif isinstance(obj, ObjectId):
+        return str(obj)
+    return obj
+
 async def get_image_metadata(image_id):
     """Get metadata for an image"""
     # First check in embeddings collection to get the source collection
@@ -462,9 +479,11 @@ async def get_image_metadata(image_id):
         # Search in posts
         post = posts_collection.find_one({"_id": ObjectId(image_id)})
         if post:
+            # Convert all ObjectId fields to strings
+            post_data = convert_objectid_to_str(dict(post))
             return {
                 "collection": "posts", 
-                "data": post,
+                "data": post_data,
                 "image_url": f"https://{BUCKET}.s3.{REGION}.amazonaws.com/{post.get('imgKey', '')}"
             }
     
@@ -473,12 +492,14 @@ async def get_image_metadata(image_id):
         if parent_id:
             comment = comments_collection.find_one({"_id": ObjectId(parent_id)})
             if comment:
+                # Convert all ObjectId fields to strings
+                comment_data = convert_objectid_to_str(dict(comment))
                 # Find the specific attachment
                 for attachment in comment.get("mediaAttachments", []):
                     if str(attachment.get("_id", "")) == image_id:
                         return {
                             "collection": "comments", 
-                            "data": comment,
+                            "data": comment_data,
                             "image_url": attachment.get("fileUrl", "")
                         }
     
@@ -487,12 +508,14 @@ async def get_image_metadata(image_id):
         if parent_id:
             reply = replies_collection.find_one({"_id": ObjectId(parent_id)})
             if reply:
+                # Convert all ObjectId fields to strings
+                reply_data = convert_objectid_to_str(dict(reply))
                 # Find the specific attachment
                 for attachment in reply.get("mediaAttachments", []):
                     if str(attachment.get("_id", "")) == image_id:
                         return {
                             "collection": "replies", 
-                            "data": reply,
+                            "data": reply_data,
                             "image_url": attachment.get("fileUrl", "")
                         }
     
